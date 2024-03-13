@@ -1,28 +1,35 @@
 #![cfg_attr(any(not(target_os = "macos"), feature = "macos-blade"), allow(unused))]
 
-use std::{
-    env,
-    path::{Path, PathBuf},
-};
-
-use cbindgen::Config;
-
 //TODO: consider generating shader code for WGSL
 //TODO: deprecate "runtime-shaders" and "macos-blade"
 
 fn main() {
-    #[cfg(target_os = "macos")]
-    generate_dispatch_bindings();
-    #[cfg(all(target_os = "macos", not(feature = "macos-blade")))]
-    let header_path = generate_shader_bindings();
-    #[cfg(all(target_os = "macos", not(feature = "macos-blade")))]
-    #[cfg(feature = "runtime_shaders")]
-    emit_stitched_shaders(&header_path);
-    #[cfg(all(target_os = "macos", not(feature = "macos-blade")))]
-    #[cfg(not(feature = "runtime_shaders"))]
-    compile_metal_shaders(&header_path);
+    #[cfg(target = "macos")]
+    macos::build();
 }
 
+#[cfg(target_os = "macos")]
+mod macos {
+    use std::{
+        env,
+        path::{Path, PathBuf},
+    };
+
+    use cbindgen::Config;
+    
+    fn build() {
+        generate_dispatch_bindings();
+        #[cfg(not(feature = "macos-blade"))]
+        {
+            let header_path = generate_shader_bindings();
+            #[cfg(feature = "runtime_shaders")]
+            {
+                emit_stitched_shaders(&header_path);
+                compile_metal_shaders(&header_path);
+            }
+        }
+    }
+    
 fn generate_dispatch_bindings() {
     println!("cargo:rustc-link-lib=framework=System");
     println!("cargo:rerun-if-changed=src/platform/mac/dispatch.h");
@@ -182,4 +189,5 @@ fn compile_metal_shaders(header_path: &Path) {
         );
         process::exit(1);
     }
+}
 }
